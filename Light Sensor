@@ -1,0 +1,94 @@
+#include <Wire.h>
+#include <WiFiNINA.h>
+#include "secrets.h" 
+#include <BH1750.h>   
+
+char HOST_NAME[] = "maker.ifttt.com";
+
+String EVENT_SUNLIGHT = "/trigger/Sunlight_Detect/with/key/bI136MjS7LqbVTjl_Cr_yK";
+String EVENT_NO_SUNLIGHT = "/trigger/No_Sunlight_Detect/with/key/bI136MjS7LqbVTjl_Cr_yK";
+
+BH1750 lightMeter;
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial);
+
+  Wire.begin();
+  Serial.println("Initialising BH1750");
+  if (!lightMeter.begin()) {
+    Serial.println("Failed to initialise BH1750");
+    while (1); 
+  }
+  Serial.println("BH1750 initialised successfully");
+
+//wifi
+  Serial.println("Connecting to WiFi..");
+  WiFi.begin(SECRET_SSID, SECRET_PASS);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\nFailed to connect to WiFi");
+    return;
+  }
+}
+
+void loop() {
+  delay(100); 
+
+  float lux = lightMeter.readLightLevel();
+
+  if (lux < 0) {
+    Serial.println("Error reading light level not doing IFTTT Request.");
+    return;
+  }
+
+  Serial.print("Light Level: ");
+  Serial.println(lux);
+
+  float threshold = 50.0; 
+
+  if (lux > threshold) {
+    sendIFTTTRequest(EVENT_SUNLIGHT);
+  } else {
+    sendIFTTTRequest(EVENT_NO_SUNLIGHT);
+  }
+
+  delay(5000); 
+}
+
+void sendIFTTTRequest(String event) {
+  Serial.println("Connecting to IFTTT");
+
+  if (client.connect(HOST_NAME, 80)) {
+    Serial.println("Connected to IFTTT");
+
+    client.print("GET " + event + " HTTP/1.1\r\n");
+    client.print("Host: " + String(HOST_NAME) + "\r\n");
+    client.print("Connection: close\r\n\r\n");
+
+    Serial.println("Request sent");
+
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        Serial.print(c);
+      }
+    }
+
+    client.stop();
+    Serial.println("\nDisconnected from IFTTT.");
+  } else {
+    Serial.println("Connection to IFTTT failed");
+  }
+}
