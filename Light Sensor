@@ -1,15 +1,16 @@
-#include <Wire.h>
+#include <Wire.h> 
 #include <WiFiNINA.h>
 #include "secrets.h" 
 #include <BH1750.h>   
 
 char HOST_NAME[] = "maker.ifttt.com";
-
 String EVENT_SUNLIGHT = "/trigger/Sunlight_Detect/with/key/bI136MjS7LqbVTjl_Cr_yK";
 String EVENT_NO_SUNLIGHT = "/trigger/No_Sunlight_Detect/with/key/bI136MjS7LqbVTjl_Cr_yK";
 
 BH1750 lightMeter;
 WiFiClient client;
+
+float lastLux = -1.0;
 
 void setup() {
   Serial.begin(115200);
@@ -23,7 +24,7 @@ void setup() {
   }
   Serial.println("BH1750 initialised successfully");
 
-//wifi
+  // Wifi
   Serial.println("Connecting to WiFi..");
   WiFi.begin(SECRET_SSID, SECRET_PASS);
   int attempts = 0;
@@ -33,9 +34,9 @@ void setup() {
     attempts++;
   }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected!");
-    Serial.print("IP Address: ");
+  if (WiFi.status() == WL_CONNECTED) { //RCOW
+    Serial.println("\nWiFi connected");
+    Serial.print("IP Address ");
     Serial.println(WiFi.localIP());
   } else {
     Serial.println("\nFailed to connect to WiFi");
@@ -49,7 +50,7 @@ void loop() {
   float lux = lightMeter.readLightLevel();
 
   if (lux < 0) {
-    Serial.println("Error reading light level not doing IFTTT Request.");
+    Serial.println("Error reading light level not doing IFTTT Request");
     return;
   }
 
@@ -58,10 +59,14 @@ void loop() {
 
   float threshold = 50.0; 
 
-  if (lux > threshold) {
-    sendIFTTTRequest(EVENT_SUNLIGHT);
-  } else {
-    sendIFTTTRequest(EVENT_NO_SUNLIGHT);
+
+  if (lux != lastLux) {
+    if (lux > threshold) {
+      sendIFTTTRequest(EVENT_SUNLIGHT);
+    } else {
+      sendIFTTTRequest(EVENT_NO_SUNLIGHT);
+    }
+    lastLux = lux; 
   }
 
   delay(5000); 
@@ -87,7 +92,7 @@ void sendIFTTTRequest(String event) {
     }
 
     client.stop();
-    Serial.println("\nDisconnected from IFTTT.");
+    Serial.println("\nDisconnected from the IFTTT");
   } else {
     Serial.println("Connection to IFTTT failed");
   }
